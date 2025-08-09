@@ -4,8 +4,7 @@ from .config import Config
 
 def create_app():
     """
-    应用工厂函数 (最终精简版)。
-    这个版本直接将对齐工具作为应用的根页面。
+    应用工厂函数 (最终修正版)。
     """
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -15,9 +14,9 @@ def create_app():
     from .views.aligner_views import aligner_bp
     
     # --- 核心修改 ---
-    # 将 aligner_bp 注册到应用的根URL ("/") 上
-    # 这意味着访问 "your-app.onrender.com/" 就会直接显示对齐工具
-    app.register_blueprint(aligner_bp, url_prefix='/')
+    # 我们不再使用 url_prefix，而是直接注册蓝图。
+    # 具体的URL路径将完全由视图函数自己决定。
+    app.register_blueprint(aligner_bp)
     # ----------------
 
     return app
