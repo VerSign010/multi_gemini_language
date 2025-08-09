@@ -1,10 +1,7 @@
 {% extends "base.html" %}
 
-<!-- START BLOCK: title -->
 {% block title %}Gemini 三语对齐工具 (自动化版){% endblock %}
-<!-- END BLOCK: title -->
 
-<!-- START BLOCK: head_styles -->
 {% block head_styles %}
 <style>
     /* 样式与之前版本保持一致 */
@@ -21,9 +18,7 @@
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
 {% endblock %}
-<!-- END BLOCK: head_styles -->
 
-<!-- START BLOCK: content -->
 {% block content %}
 <h3>自动化流程控制</h3>
 <div class="control-grid">
@@ -47,9 +42,9 @@
     <div class="control-group">
         <label>批次间随机间隔 (秒):</label>
         <div class="interval-group">
-            <input type="number" id="interval-min" class="form-control" value="10" min="0">
+            <input type="number" id="interval-min" class="form-control" value="3" min="0">
             <span>-</span>
-            <input type="number" id="interval-max" class="form-control" value="20" min="0">
+            <input type="number" id="interval-max" class="form-control" value="5" min="0">
         </div>
     </div>
 </div>
@@ -74,7 +69,7 @@
 
 <div class="diagnostic-mode">
     <input type="checkbox" id="diagnostic-mode-checkbox" class="form-check-input">
-    <label for="diagnostic-mode-checkbox" class="form-check-label">开启诊断模式 (如果遇到错误，请勾选此项并重新运行)</label>
+    <label for="diagnostic-mode-checkbox" class="form-check-label">开启诊断模式 (用于调试)</label>
 </div>
 
 <div class="button-container">
@@ -90,12 +85,10 @@
 <div id="status-bar" class="status-bar">准备就绪</div>
 
 {% endblock %}
-<!-- END BLOCK: content -->
 
-<!-- START BLOCK: scripts -->
 {% block scripts %}
 <script>
-    // --- Element Selectors ---
+    // JavaScript部分与上一版几乎相同，只是简化了错误处理
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
     const logBox = document.getElementById('logBox');
@@ -114,16 +107,13 @@
         sheetUrl: document.getElementById('sheetUrl'),
         sheetName: document.getElementById('sheetName')
     };
-    const SETTINGS_KEY = 'alignerToolSettings';
+    const SETTINGS_KEY = 'alignerToolSettings_ServiceAccount'; // 使用新的key以避免与旧设置冲突
 
     let isProcessing = false;
 
-    // --- Settings Persistence Logic ---
     function saveSettings() {
         const currentSettings = {};
-        for (const key in settingsInputs) {
-            currentSettings[key] = settingsInputs[key].value;
-        }
+        for (const key in settingsInputs) { currentSettings[key] = settingsInputs[key].value; }
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(currentSettings));
     }
 
@@ -131,36 +121,20 @@
         const savedSettingsJSON = localStorage.getItem(SETTINGS_KEY);
         if (savedSettingsJSON) {
             const savedSettings = JSON.parse(savedSettingsJSON);
-            for (const key in savedSettings) {
-                if (settingsInputs[key]) {
-                    settingsInputs[key].value = savedSettings[key];
-                }
-            }
-            // 确保加载后也更新一次显示
+            for (const key in savedSettings) { if (settingsInputs[key]) { settingsInputs[key].value = savedSettings[key]; } }
             temperatureValueSpan.textContent = parseFloat(settingsInputs.temperature.value).toFixed(2);
         }
     }
     
-    // --- Event Listeners ---
     document.addEventListener('DOMContentLoaded', loadSettings);
     startButton.addEventListener('click', startAutomation);
     stopButton.addEventListener('click', stopAutomation);
-
-    // --- 这里是核心修改 ---
-    // 为滑块添加一个 'input' 事件监听器，实时更新显示的数字
-    temperatureSlider.addEventListener('input', () => {
-        temperatureValueSpan.textContent = parseFloat(temperatureSlider.value).toFixed(2);
-        // 注意：保存设置的监听器仍然是必要的，以持久化数据
-    });
-    // -------------------
-
-    // 为所有输入控件添加 'change' 或 'input' 事件监听器来保存设置
+    temperatureSlider.addEventListener('input', () => { temperatureValueSpan.textContent = parseFloat(temperatureSlider.value).toFixed(2); });
     Object.values(settingsInputs).forEach(input => {
-        const eventType = (input.type === 'range' || input.type === 'text' || input.type === 'url' || input.type === 'number') ? 'input' : 'change';
+        const eventType = (input.type.match(/range|text|url|number/)) ? 'input' : 'change';
         input.addEventListener(eventType, saveSettings);
     });
 
-    // --- Core Application Logic ---
     function stopAutomation() {
         if (isProcessing) {
             isProcessing = false;
@@ -182,7 +156,6 @@
     
     function startAutomation() {
         if (isProcessing) return;
-
         updateButtonStates(true);
         logBox.textContent = '';
         logMessage('正在启动任务...');
@@ -212,8 +185,10 @@
             body: JSON.stringify(params)
         })
         .then(response => {
-            if (response.status === 401) { throw new Error('授权失败或已过期，请重新登录。'); }
-            if (!response.ok) { throw new Error(`服务器错误: ${response.status}`); }
+            if (!response.ok) {
+                // 简化错误处理，不再检查401
+                throw new Error(`服务器错误: ${response.status}. 请检查后端日志。`);
+            }
             if (!response.body) { throw new Error('响应流不可用。'); }
 
             const reader = response.body.getReader();
@@ -236,10 +211,8 @@
                         updateButtonStates(false);
                         return;
                     }
-
                     const chunk = decoder.decode(value, { stream: true });
                     const lines = chunk.split('\n\n');
-                    
                     lines.forEach(line => {
                         if (line.startsWith('data: ')) {
                             const message = line.substring(6).trim();
@@ -260,4 +233,3 @@
     }
 </script>
 {% endblock %}
-<!-- END BLOCK: scripts -->
