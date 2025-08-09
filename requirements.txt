@@ -43,3 +43,4 @@ youtube-transcript-api
 # ================================
 python-dotenv        # 用于管理 .env 文件
 requests
+Markdown
