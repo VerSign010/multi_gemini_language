@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+<!-- START BLOCK: title -->
+{% block title %}Gemini 三语对齐工具 (自动化版){% endblock %}
+<!-- END BLOCK: title -->
+
+<!-- START BLOCK: head_styles -->
+{% block head_styles %}
+<style>
+    /* 样式与之前版本保持一致 */
+    .control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+    .control-group, .button-container, .main-content, .diagnostic-mode { margin-top: 20px; }
+    .control-group label { font-weight: bold; }
+    .interval-group { display: flex; align-items: center; gap: 5px; }
+    .log-box { height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background-color: #f8f9fa; font-family: monospace; white-space: pre-wrap; }
+    #start-button { background-color: #28a745; }
+    #stop-button { background-color: #dc3545; }
+    .status-bar { min-height: 48px; display: flex; justify-content: center; align-items: center; background-color: #e9ecef; border-radius: 5px; padding: 10px; font-size: 1.1em; font-weight: 500;}
+    .diagnostic-mode { display: flex; align-items: center; gap: 5px; background-color: #fff3cd; padding: 8px; border-radius: 5px; }
+    .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 24px; height: 24px; animation: spin 1s linear infinite; margin-right: 10px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+<!-- END BLOCK: head_styles -->
+
+<!-- START BLOCK: content -->
+{% block content %}
+<h3>自动化流程控制</h3>
+<div class="control-grid">
+    <div class="control-group">
+        <label for="model-selector">选择 Gemini 模型:</label>
+        <select id="model-selector" class="form-select">
+            <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
+            <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash</option>
+            <option value="gemini-pro">Gemini 1.0 Pro</option>
+            <option value="gemini-2.5-pro" selected>Gemini 2.5 Pro</option>
+        </select>
+    </div>
+    <div class="control-group">
+        <label for="temperature-slider">Temperature: <span id="temperature-value">0.20</span></label>
+        <input type="range" class="form-range" id="temperature-slider" min="0" max="1" step="0.05" value="0.2">
+    </div>
+    <div class="control-group">
+        <label for="batch-size">批次大小 (段落数):</label>
+        <input type="number" id="batch-size" class="form-control" value="1" min="1">
+    </div>
+    <div class="control-group">
+        <label>批次间随机间隔 (秒):</label>
+        <div class="interval-group">
+            <input type="number" id="interval-min" class="form-control" value="10" min="0">
+            <span>-</span>
+            <input type="number" id="interval-max" class="form-control" value="20" min="0">
+        </div>
+    </div>
+</div>
+
+<hr>
+
+<h3>输入与输出</h3>
+<div class="control-grid">
+    <div class="control-group">
+        <label for="docUrl">源 Google Doc 链接:</label>
+        <input type="url" class="form-control" id="docUrl" placeholder="https://docs.google.com/document/d/YOUR_DOC_ID/edit">
+    </div>
+    <div class="control-group">
+        <label for="sheetUrl">目标 Google Sheet 链接:</label>
+        <input type="url" class="form-control" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit">
+    </div>
+    <div class="control-group">
+        <label for="sheetName">目标工作表名称:</label>
+        <input type="text" class="form-control" id="sheetName" value="Sheet1" placeholder="例如: Sheet1">
+    </div>
+</div>
+
+<div class="diagnostic-mode">
+    <input type="checkbox" id="diagnostic-mode-checkbox" class="form-check-input">
+    <label for="diagnostic-mode-checkbox" class="form-check-label">开启诊断模式 (如果遇到错误，请勾选此项并重新运行)</label>
+</div>
+
+<div class="button-container">
+    <button id="start-button" class="btn btn-success btn-lg">开始自动化处理</button>
+    <button id="stop-button" class="btn btn-danger btn-lg" disabled>停止处理</button>
+</div>
+
+<div class="main-content">
+    <h5>处理日志</h5>
+    <div id="logBox" class="log-box">等待任务开始...</div>
+</div>
+
+<div id="status-bar" class="status-bar">准备就绪</div>
+
+{% endblock %}
+<!-- END BLOCK: content -->
+
+<!-- START BLOCK: scripts -->
+{% block scripts %}
+<script>
+    // --- Element Selectors ---
+    const startButton = document.getElementById('start-button');
+    const stopButton = document.getElementById('stop-button');
+    const logBox = document.getElementById('logBox');
+    const statusBar = document.getElementById('status-bar');
+    const temperatureSlider = document.getElementById('temperature-slider');
+    const temperatureValueSpan = document.getElementById('temperature-value');
+    const diagnosticCheckbox = document.getElementById('diagnostic-mode-checkbox');
+
+    const settingsInputs = {
+        model: document.getElementById('model-selector'),
+        temperature: temperatureSlider,
+        batchSize: document.getElementById('batch-size'),
+        intervalMin: document.getElementById('interval-min'),
+        intervalMax: document.getElementById('interval-max'),
+        docUrl: document.getElementById('docUrl'),
+        sheetUrl: document.getElementById('sheetUrl'),
+        sheetName: document.getElementById('sheetName')
+    };
+    const SETTINGS_KEY = 'alignerToolSettings';
+
+    let isProcessing = false;
+
+    // --- Settings Persistence Logic ---
+    function saveSettings() {
+        const currentSettings = {};
+        for (const key in settingsInputs) {
+            currentSettings[key] = settingsInputs[key].value;
+        }
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(currentSettings));
+    }
+
+    function loadSettings() {
+        const savedSettingsJSON = localStorage.getItem(SETTINGS_KEY);
+        if (savedSettingsJSON) {
+            const savedSettings = JSON.parse(savedSettingsJSON);
+            for (const key in savedSettings) {
+                if (settingsInputs[key]) {
+                    settingsInputs[key].value = savedSettings[key];
+                }
+            }
+            // 确保加载后也更新一次显示
+            temperatureValueSpan.textContent = parseFloat(settingsInputs.temperature.value).toFixed(2);
+        }
+    }
+    
+    // --- Event Listeners ---
+    document.addEventListener('DOMContentLoaded', loadSettings);
+    startButton.addEventListener('click', startAutomation);
+    stopButton.addEventListener('click', stopAutomation);
+
+    // --- 这里是核心修改 ---
+    // 为滑块添加一个 'input' 事件监听器，实时更新显示的数字
+    temperatureSlider.addEventListener('input', () => {
+        temperatureValueSpan.textContent = parseFloat(temperatureSlider.value).toFixed(2);
+        // 注意：保存设置的监听器仍然是必要的，以持久化数据
+    });
+    // -------------------
+
+    // 为所有输入控件添加 'change' 或 'input' 事件监听器来保存设置
+    Object.values(settingsInputs).forEach(input => {
+        const eventType = (input.type === 'range' || input.type === 'text' || input.type === 'url' || input.type === 'number') ? 'input' : 'change';
+        input.addEventListener(eventType, saveSettings);
+    });
+
+    // --- Core Application Logic ---
+    function stopAutomation() {
+        if (isProcessing) {
+            isProcessing = false;
+            statusBar.innerHTML = '<span>正在发送停止信号...</span>';
+            stopButton.disabled = true;
+        }
+    }
+
+    function updateButtonStates(processing) {
+        isProcessing = processing;
+        startButton.disabled = processing;
+        stopButton.disabled = !processing;
+    }
+
+    function logMessage(message) {
+        logBox.textContent += message + '\n';
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+    
+    function startAutomation() {
+        if (isProcessing) return;
+
+        updateButtonStates(true);
+        logBox.textContent = '';
+        logMessage('正在启动任务...');
+        statusBar.innerHTML = '<div class="loader"></div><span>正在连接服务器...</span>';
+
+        const params = {
+            doc_url: settingsInputs.docUrl.value,
+            sheet_url: settingsInputs.sheetUrl.value,
+            sheet_name: settingsInputs.sheetName.value,
+            model_name: settingsInputs.model.value,
+            temperature: parseFloat(settingsInputs.temperature.value),
+            batch_size: parseInt(settingsInputs.batchSize.value, 10),
+            interval_min: parseInt(settingsInputs.intervalMin.value, 10),
+            interval_max: parseInt(settingsInputs.intervalMax.value, 10),
+            diagnostic_mode: diagnosticCheckbox.checked
+        };
+        
+        if (!params.doc_url || !params.sheet_url) {
+            alert('请提供 Google Doc 和 Google Sheet 的链接。');
+            updateButtonStates(false);
+            return;
+        }
+
+        fetch('/process_doc_to_sheet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        .then(response => {
+            if (response.status === 401) { throw new Error('授权失败或已过期，请重新登录。'); }
+            if (!response.ok) { throw new Error(`服务器错误: ${response.status}`); }
+            if (!response.body) { throw new Error('响应流不可用。'); }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            function processStream() {
+                if (!isProcessing) {
+                    reader.cancel();
+                    logMessage('\n处理已停止。');
+                    statusBar.innerHTML = '<span>处理已停止。</span>';
+                    updateButtonStates(false);
+                    return;
+                }
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        if (isProcessing) {
+                            logMessage('\n任务流结束。');
+                            statusBar.innerHTML = '<span>任务完成！</span>';
+                        }
+                        updateButtonStates(false);
+                        return;
+                    }
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n\n');
+                    
+                    lines.forEach(line => {
+                        if (line.startsWith('data: ')) {
+                            const message = line.substring(6).trim();
+                            logMessage(message);
+                            statusBar.innerHTML = `<span>${message.split('\n')[0]}</span>`;
+                        }
+                    });
+                    processStream();
+                });
+            }
+            processStream();
+        })
+        .catch(error => {
+            logMessage(`\n[致命错误] 请求失败: ${error.message}`);
+            statusBar.innerHTML = `<span>请求失败！</span>`;
+            updateButtonStates(false);
+        });
+    }
+</script>
+{% endblock %}
+<!-- END BLOCK: scripts -->

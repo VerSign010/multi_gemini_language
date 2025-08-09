@@ -1,0 +1,379 @@
+<!-- templates/google_sheets_tool.html -->
+{% extends "base.html" %}
+
+<!-- START BLOCK: title -->
+{% block title %}Gemini Sheets 自动化流水线{% endblock %}
+<!-- END BLOCK: title -->
+
+<!-- START BLOCK: head_styles -->
+{% block head_styles %}
+<style>
+    .container { max-width: 900px; }
+    h3 { text-align: center; color: #212529; }
+    .section { margin-bottom: 25px; padding: 20px; border: 1px solid #e9ecef; border-radius: 8px; }
+    .control-grid { grid-template-columns: 1fr 1fr; }
+    .control-group.full-width { grid-column: 1 / -1; }
+    #temperature-value { font-weight: bold; color: #007bff; }
+    .button-container { display: flex; gap: 10px; margin-top: 15px; }
+    .button-container button { flex-grow: 1; padding: 12px; }
+    #add-task-button { background-color: #17a2b8; font-size: 16px; }
+    #start-pipeline-button { background-color: #28a745; }
+    #stop-pipeline-button { background-color: #dc3545; }
+    #task-queue { margin-top: 15px; }
+    .task-item { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+    .task-item button { font-size: 12px; padding: 3px 8px; flex-grow: 0; background-color: #6c757d; }
+    #log-container { margin-top: 20px; background-color: #212529; color: #f8f9fa; padding: 15px; border-radius: 8px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 14px; white-space: pre-wrap; }
+    .log-entry { border-bottom: 1px solid #495057; padding-bottom: 5px; margin-bottom: 5px; }
+    .log-error { color: #dc3545; font-weight: bold; }
+    .log-success { color: #28a745; }
+    .log-task-header { color: #ffc107; font-weight: bold; margin-top: 10px; }
+</style>
+{% endblock %}
+<!-- END BLOCK: head_styles -->
+
+<!-- START BLOCK: content -->
+{% block content %}
+<div class="section">
+    <h3>第一步：配置通用参数</h3>
+    <!-- *** MODIFIED: Added a class 'saveable-setting' to all inputs we want to save *** -->
+    <div class="control-grid">
+        <div class="control-group full-width">
+            <label for="sheet-url">Google Sheet 链接:</label>
+            <input type="text" id="sheet-url" class="saveable-setting" placeholder="粘贴完整的Google Sheet链接...">
+        </div>
+        <div class="control-group full-width">
+            <label for="sheet-name">工作表名称 (Sheet Name):</label>
+            <input type="text" id="sheet-name" class="saveable-setting" value="Sheet1" placeholder="例如: Sheet1, 工作表1, My Data...">
+        </div>
+        <div class="control-group">
+            <label for="start-row">起始行:</label>
+            <input type="number" id="start-row" class="saveable-setting" value="2" min="1">
+        </div>
+        <div class="control-group">
+            <label for="end-row">结束行:</label>
+            <input type="number" id="end-row" class="saveable-setting" value="100" min="1">
+        </div>
+        <div class="control-group">
+            <label for="model-selector">选择模型:</label>
+            <select id="model-selector" class="saveable-setting">
+                <option value="gemini-2.5-pro" selected>Gemini 2.5 Pro</option>
+                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
+                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash</option>
+                <option value="gemini-pro">Gemini 1.0 Pro</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="batch-size">批次大小 (行):</label>
+            <input type="number" id="batch-size" class="saveable-setting" value="5" min="1">
+        </div>
+        <div class="control-group">
+            <label>随机间隔 (秒):</label>
+            <div class="interval-group">
+                <input type="number" id="interval-min" class="saveable-setting" value="10" min="0">
+                <span>-</span>
+                <input type="number" id="interval-max" class="saveable-setting" value="20" min="0">
+            </div>
+        </div>
+        <div class="control-group">
+            <label for="temperature-slider">Temperature: <span id="temperature-value">0.2</span></label>
+            <input type="range" id="temperature-slider" class="saveable-setting" min="0.0" max="1.0" step="0.05" value="0.2" oninput="document.getElementById('temperature-value').textContent = this.value">
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h3>第二步：构建任务流水线</h3>
+    <div class="control-grid">
+        <div class="control-group">
+            <label for="check-type">检查类型:</label>
+            <select id="check-type">
+                <option value="grammar" selected>语法与术语检查</option>
+                <option value="semantic">语义与逻辑检查</option>
+                <option value="style">修饰范围检查</option>
+                <option value="full_review">【旧】完整三合一检查</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="read-cols">读取列 (逗号分隔):</label>
+            <input type="text" id="read-cols" value="A,B,C,D">
+        </div>
+        <div class="control-group">
+            <label for="write-col">写入列:</label>
+            <input type="text" id="write-col" value="E">
+        </div>
+        <div class="control-group">
+            <button id="add-task-button">添加到队列</button>
+        </div>
+    </div>
+    <div id="task-queue"></div>
+</div>
+
+<div class="section">
+    <h3>第三步：执行与监控</h3>
+    <div class="button-container">
+        <button id="start-pipeline-button">开始执行流水线</button>
+        <button id="stop-pipeline-button" disabled>停止流水线</button>
+    </div>
+    <div id="log-container"></div>
+</div>
+{% endblock %}
+<!-- END BLOCK: content -->
+
+<!-- START BLOCK: scripts -->
+{% block scripts %}
+<script>
+    // --- 原有JS代码部分 ---
+    const startPipelineButton = document.getElementById('start-pipeline-button');
+    const stopPipelineButton = document.getElementById('stop-pipeline-button');
+    const addTaskButton = document.getElementById('add-task-button');
+    const logContainer = document.getElementById('log-container');
+    const taskQueueContainer = document.getElementById('task-queue');
+
+    let taskQueue = [];
+    let isPipelineRunning = false;
+    let currentReader = null;
+
+    addTaskButton.addEventListener('click', addTaskToQueue);
+    startPipelineButton.addEventListener('click', startPipeline);
+    stopPipelineButton.addEventListener('click', stopPipeline);
+
+    function addTaskToQueue() {
+        const checkTypeSelect = document.getElementById('check-type');
+        const task = {
+            id: Date.now(),
+            check_type: checkTypeSelect.value,
+            check_type_text: checkTypeSelect.options[checkTypeSelect.selectedIndex].text,
+            read_cols: document.getElementById('read-cols').value,
+            write_col: document.getElementById('write-col').value
+        };
+        taskQueue.push(task);
+        renderTaskQueue();
+    }
+
+    function renderTaskQueue() {
+        taskQueueContainer.innerHTML = '';
+        taskQueue.forEach((task, index) => {
+            const taskDiv = document.createElement('div');
+            taskDiv.className = 'task-item';
+            taskDiv.innerHTML = `
+                <span><b>步骤 ${index + 1}:</b> ${task.check_type_text} (读取: ${task.read_cols}, 写入: ${task.write_col})</span>
+                <button onclick="removeTask(${task.id})">移除</button>
+            `;
+            taskQueueContainer.appendChild(taskDiv);
+        });
+    }
+
+    function removeTask(taskId) {
+        taskQueue = taskQueue.filter(task => task.id !== taskId);
+        renderTaskQueue();
+    }
+
+    function logMessage(message, type = 'info') {
+        const entry = document.createElement('div');
+        if (type === 'header') {
+            entry.className = 'log-task-header';
+        } else {
+            entry.className = 'log-entry';
+            if (type === 'error') entry.classList.add('log-error');
+            if (type === 'success') entry.classList.add('log-success');
+        }
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logContainer.appendChild(entry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function extractSheetIdFromUrl(url) {
+        const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        return match ? match[1] : null;
+    }
+
+    function stopPipeline() {
+        if (isPipelineRunning) {
+            isPipelineRunning = false;
+            if (currentReader) {
+                currentReader.cancel();
+                currentReader = null;
+            }
+            logMessage('流水线已手动停止。', 'info');
+        }
+        startPipelineButton.disabled = false;
+        stopPipelineButton.disabled = true;
+        startPipelineButton.textContent = '开始执行流水线';
+    }
+
+    async function startPipeline() {
+        if (isPipelineRunning) return;
+        if (taskQueue.length === 0) {
+            alert('请至少添加一个任务到队列中！');
+            return;
+        }
+        isPipelineRunning = true;
+
+        startPipelineButton.disabled = true;
+        stopPipelineButton.disabled = false;
+        startPipelineButton.textContent = '流水线运行中...';
+        logContainer.innerHTML = '';
+        logMessage('流水线启动...');
+
+        const commonPayload = {
+            sheet_id: extractSheetIdFromUrl(document.getElementById('sheet-url').value),
+            sheet_name: document.getElementById('sheet-name').value.trim(),
+            start_row: document.getElementById('start-row').value,
+            end_row: document.getElementById('end-row').value,
+            model_name: document.getElementById('model-selector').value,
+            batch_size: document.getElementById('batch-size').value,
+            interval_min: document.getElementById('interval-min').value,
+            interval_max: document.getElementById('interval-max').value,
+            temperature: document.getElementById('temperature-slider').value,
+        };
+
+        if (!commonPayload.sheet_id || !commonPayload.sheet_name) {
+            alert('请输入有效的Sheet链接和工作表名称！');
+            stopPipeline();
+            return;
+        }
+
+        for (let i = 0; i < taskQueue.length; i++) {
+            if (!isPipelineRunning) break;
+
+            const task = taskQueue[i];
+            logMessage(`--- 开始执行步骤 ${i + 1}: ${task.check_type_text} ---`, 'header');
+
+            const taskPayload = {
+                ...commonPayload,
+                check_type: task.check_type,
+                read_cols: task.read_cols.split(',').map(c => c.trim().toUpperCase()),
+                write_col: task.write_col.trim().toUpperCase()
+            };
+
+            const success = await executeTask(taskPayload);
+            if (!success) {
+                logMessage(`步骤 ${i + 1} 失败，流水线已中止。`, 'error');
+                break;
+            }
+        }
+
+        if (isPipelineRunning) {
+            logMessage('所有流水线任务执行完毕！', 'success');
+        }
+        stopPipeline();
+    }
+
+    function executeTask(payload) {
+        return new Promise((resolve) => {
+            fetch('/process_sheet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(response => {
+                if (!response.ok) {
+                    response.text().then(text => {
+                        logMessage(`服务器错误: ${response.status} - ${text}`, 'error');
+                        resolve(false);
+                    });
+                    return;
+                }
+                currentReader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function read() {
+                    if (!isPipelineRunning) {
+                        currentReader.cancel();
+                        resolve(false);
+                        return;
+                    }
+                    currentReader.read().then(({ done, value }) => {
+                        if (done) {
+                            resolve(true);
+                            return;
+                        }
+                        const chunk = decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\n\n');
+                        lines.forEach(line => {
+                            if (line.startsWith('data: ')) {
+                                const message = line.substring(6).trim();
+                                if (message.startsWith('[DONE]')) {
+                                    logMessage(message.substring(7));
+                                } else if (message.startsWith('[ERROR]')) {
+                                    logMessage(message.substring(8), 'error');
+                                    resolve(false);
+                                } else if (message) {
+                                    logMessage(message);
+                                }
+                            }
+                        });
+                        read();
+                    }).catch(err => {
+                        logMessage(`读取流时出错: ${err}`, 'error');
+                        resolve(false);
+                    });
+                }
+                read();
+            }).catch(error => {
+                logMessage(`连接失败: ${error.message}`, 'error');
+                resolve(false);
+            });
+        });
+    }
+
+    // --- 【新增】本地存储逻辑 ---
+    
+    const settingsToSave = [
+        'sheet-url', 'sheet-name', 'start-row', 'end-row', 
+        'model-selector', 'batch-size', 'interval-min', 
+        'interval-max', 'temperature-slider'
+    ];
+    const STORAGE_KEY = 'geminiPipelineSettings';
+
+    /**
+     * 将当前表单中的所有设置保存到浏览器的 localStorage。
+     */
+    function saveSettings() {
+        const settings = {};
+        settingsToSave.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                settings[id] = element.value;
+            }
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
+
+    /**
+     * 从 localStorage 加载已保存的设置并填充到表单中。
+     */
+    function loadSettings() {
+        const savedSettings = localStorage.getItem(STORAGE_KEY);
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            settingsToSave.forEach(id => {
+                const element = document.getElementById(id);
+                if (element && settings[id] !== undefined) {
+                    element.value = settings[id];
+                    // 特殊处理 temperature slider 的文本显示
+                    if (id === 'temperature-slider') {
+                        document.getElementById('temperature-value').textContent = settings[id];
+                    }
+                }
+            });
+        }
+    }
+
+    // 页面加载时，自动加载设置
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSettings();
+
+        // 为所有需要保存的设置项添加事件监听器，当它们的值改变时自动保存
+        settingsToSave.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                // 对滑块使用 'input' 事件以实时响应，其他使用 'change' 事件
+                const eventType = (element.type === 'range') ? 'input' : 'change';
+                element.addEventListener(eventType, saveSettings);
+            }
+        });
+    });
+
+</script>
+{% endblock %}
+<!-- END BLOCK: scripts -->

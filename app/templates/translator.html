@@ -1,0 +1,184 @@
+<!-- templates/translator.html -->
+{% extends "base.html" %}
+
+<!-- START BLOCK: title -->
+{% block title %}Gemini 高级翻译器{% endblock %}
+<!-- END BLOCK: title -->
+
+<!-- START BLOCK: head_styles -->
+{% block head_styles %}
+<style>
+    .control-group select { padding: 10px; }
+    .main-content { flex-grow: 1; display: flex; min-height: 0; }
+    .panes-container { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+    .input-pane, .output-panes { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .output-panes { flex-direction: row; gap: 15px; }
+    .output-pane { flex: 1; display: flex; flex-direction: column; }
+    .pane-title { font-weight: bold; margin-bottom: 5px; color: #495057; }
+    .button-container { display: flex; gap: 20px; align-items: center; margin-top: 20px; flex-shrink: 0; }
+    #translate-button { flex-grow: 2; background-color: #28a745; }
+    #translate-button .loader { border-top-color: #fff; }
+    .dual-version-toggle { display: flex; align-items: center; }
+</style>
+{% endblock %}
+<!-- END BLOCK: head_styles -->
+
+<!-- START BLOCK: content -->
+{% block content %}
+<div class="control-grid">
+    <div class="control-group">
+        <label for="source-lang">源语言:</label>
+        <select id="source-lang">
+            {% for key, value in languages.items() %}
+            <option value="{{ value }}" {% if key == '自动检测' %}selected{% endif %}>{{ key }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="control-group">
+        <label for="target-lang">目标语言:</label>
+        <select id="target-lang">
+            {% for key, value in languages.items() %}
+            <option value="{{ value }}" {% if key == '中文 (简体)' %}selected{% endif %}>{{ key }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="control-group">
+        <label for="style-selector">翻译风格:</label>
+        <select id="style-selector">
+            {% for key, value in styles.items() %}
+            <option value="{{ value }}" {% if key == '默认 (平衡)' %}selected{% endif %}>{{ key }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="control-group">
+        <label for="model-selector">选择模型:</label>
+        <select id="model-selector">
+            <option value="gemini-2.5-pro" selected>Gemini 2.5 Pro</option>
+            <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
+            <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash</option>
+            <option value="gemini-pro">Gemini 1.0 Pro</option>
+        </select>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="panes-container">
+        <div class="input-pane">
+            <div class="pane-title">输入内容 (Ctrl+Enter 翻译)</div>
+            <!-- *** MODIFIED: Added rows="10" *** -->
+            <textarea id="input-text" rows="10" placeholder="在此处输入要翻译的文本..."></textarea>
+        </div>
+        <div class="output-panes">
+            <div class="output-pane">
+                <div class="pane-title">翻译结果 1</div>
+                <!-- *** MODIFIED: Added rows="10" *** -->
+                <textarea id="output-text-1" rows="10" readonly placeholder="翻译结果将显示在这里..."></textarea>
+            </div>
+            <div class="output-pane">
+                <div class="pane-title">翻译结果 2</div>
+                <!-- *** MODIFIED: Added rows="10" *** -->
+                <textarea id="output-text-2" rows="10" readonly placeholder="若启用“双版本”，第二个结果将显示在这里..."></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="button-container">
+    <button id="translate-button">翻 译</button>
+    <div class="dual-version-toggle">
+        <input type="checkbox" id="dual-version-checkbox" style="margin-right: 5px;">
+        <label for="dual-version-checkbox">提供两个版本 (结果更丰富)</label>
+    </div>
+</div>
+{% endblock %}
+<!-- END BLOCK: content -->
+
+<!-- START BLOCK: scripts -->
+{% block scripts %}
+<script>
+    // JavaScript部分无需修改
+    const translateButton = document.getElementById('translate-button');
+    const originalButtonText = translateButton.innerHTML;
+    
+    translateButton.addEventListener('click', translate);
+
+    document.getElementById('input-text').addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            translate();
+        }
+    });
+
+    async function translate() {
+        const inputText = document.getElementById('input-text').value.trim();
+        if (!inputText) {
+            alert("请输入要翻译的内容！");
+            return;
+        }
+
+        translateButton.disabled = true;
+        translateButton.innerHTML = '<div class="loader"></div>';
+
+        const outputText1 = document.getElementById('output-text-1');
+        const outputText2 = document.getElementById('output-text-2');
+        outputText1.value = '';
+        outputText2.value = '';
+
+        const payload = {
+            text: inputText,
+            source_lang: document.getElementById('source-lang').value,
+            target_lang: document.getElementById('target-lang').value,
+            style: document.getElementById('style-selector').value,
+            model_name: document.getElementById('model-selector').value,
+            dual_version: document.getElementById('dual-version-checkbox').checked
+        };
+
+        try {
+            const response = await fetch('/translate_text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`服务器错误: ${response.status}`);
+            }
+
+            if (payload.dual_version) {
+                const data = await response.json();
+                outputText1.value = data.result1;
+                outputText2.value = data.result2;
+            } else {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6);
+                            if (data.startsWith('[ERROR]')) {
+                                outputText1.value += `\n\n翻译出错: ${data.substring(8)}`;
+                            } else {
+                                outputText1.value += data;
+                            }
+                        }
+                    }
+                }
+            }
+
+        } catch (error) {
+            alert(`翻译失败: ${error.message}`);
+            outputText1.value = `错误: ${error.message}`;
+        } finally {
+            translateButton.disabled = false;
+            translateButton.innerHTML = originalButtonText;
+        }
+    }
+</script>
+{% endblock %}
+<!-- END BLOCK: scripts -->

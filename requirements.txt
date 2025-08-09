@@ -1,0 +1,18 @@
+# Flask and related web framework components
+Flask==3.0.3
+Flask-Session==0.6.0
+werkzeug==3.0.3
+
+# Google API libraries for authentication and service interaction
+google-api-python-client==2.134.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.0
+
+# Gemini AI API library
+google-generativeai==0.7.0
+
+# Utility libraries
+python-dotenv==1.0.1
+beautifulsoup4==4.12.3
+markdown==3.6
+requests==2.32.3

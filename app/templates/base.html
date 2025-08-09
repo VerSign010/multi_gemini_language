@@ -1,0 +1,55 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- START BLOCK: title -->
+    <title>{% block title %}Gemini 工具集{% endblock %}</title>
+    <!-- END BLOCK: title -->
+    <style>
+        /* --- 全局通用样式 --- */
+        html, body { height: 100%; margin: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; padding: 20px; background-color: #f8f9fa; color: #343a40; box-sizing: border-box; }
+        .container { max-width: 1200px; margin: 0 auto; background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); display: flex; flex-direction: column; min-height: calc(100vh - 40px); box-sizing: border-box; }
+        h1 { text-align: center; color: #212529; margin-bottom: 10px; flex-shrink: 0; }
+        .nav { text-align: center; margin-bottom: 20px; flex-shrink: 0; }
+        .nav a { margin: 0 15px; text-decoration: none; color: #007bff; font-weight: 500; font-size: 1.1em; }
+        .nav a.active { color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 3px; }
+        .loader { display: inline-block; border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 16px; height: 16px; animation: spin 1s linear infinite; margin-right: 10px; vertical-align: middle; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; padding: 20px; background-color: #e9ecef; border-radius: 8px; align-items: center; }
+        .control-group { display: flex; flex-direction: column; }
+        .control-group label { font-weight: bold; margin-bottom: 5px; }
+        .control-group input, .control-group select { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
+        .interval-group { display: flex; gap: 10px; align-items: center; }
+        .interval-group input { width: 60px; }
+        textarea { width: 100%; box-sizing: border-box; padding: 15px; border: 1px solid #ced4da; border-radius: 8px; font-size: 16px; resize: vertical; }
+        button { padding: 15px; color: #fff; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+    </style>
+    <!-- START BLOCK: head_styles -->
+    {% block head_styles %}{% endblock %}
+    <!-- END BLOCK: head_styles -->
+</head>
+<body>
+    <div class="container">
+        <h1>Gemini 工具集</h1>
+        <!-- *** MODIFIED: Updated all url_for() calls with blueprint namespaces *** -->
+        <div class="nav">
+            <a href="{{ url_for('main.index') }}" class="{{ 'active' if request.endpoint == 'main.index' else '' }}">审校工具</a>
+            <a href="{{ url_for('translator.translator_page') }}" class="{{ 'active' if request.endpoint == 'translator.translator_page' else '' }}">高级翻译器</a>
+            <a href="{{ url_for('aligner.aligner_page') }}" class="{{ 'active' if request.endpoint == 'aligner.aligner_page' else '' }}">三语对齐工具</a>
+            <a href="{{ url_for('sheets.google_sheets_tool_page') }}" class="{{ 'active' if request.endpoint == 'sheets.google_sheets_tool_page' else '' }}">Sheets 自动化</a>
+        </div>
+
+        <!-- START BLOCK: content -->
+        {% block content %}{% endblock %}
+        <!-- END BLOCK: content -->
+    </div>
+
+    <!-- START BLOCK: scripts -->
+    {% block scripts %}{% endblock %}
+    <!-- END BLOCK: scripts -->
+</body>
+</html>
