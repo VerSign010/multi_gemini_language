@@ -1,45 +1,45 @@
 # ================================
-# Web ¿ò¼ÜºÍ·şÎñÆ÷
+# Web æ¡†æ¶å’ŒæœåŠ¡å™¨
 # ================================
 Flask
 Flask-Session
 gunicorn
 
 # ================================
-# ºËĞÄ¹¦ÄÜ¿â
+# æ ¸å¿ƒåŠŸèƒ½åº“
 # ================================
-google-generativeai  # ÓÃÓÚ Gemini
-openai               # ÓÃÓÚ OpenAI
-google-api-python-client # ÓÃÓÚ Google Sheets/Drive µÈ
+google-generativeai  # ç”¨äº Gemini
+openai               # ç”¨äº OpenAI
+google-api-python-client # ç”¨äº Google Sheets/Drive ç­‰
 google-auth-oauthlib
-googletrans          # ÓÃÓÚ·­Òë
+googletrans          # ç”¨äºç¿»è¯‘
 
 # ================================
-# Êı¾İ´¦ÀíºÍ¿ÆÑ§¼ÆËã
+# æ•°æ®å¤„ç†å’Œç§‘å­¦è®¡ç®—
 # ================================
-pandas               # Èç¹ûÄúÓÃµ½ÁË pandas for excel
+pandas               # å¦‚æœæ‚¨ç”¨åˆ°äº† pandas for excel
 numpy
 scipy
-beautifulsoup4       # ÓÃÓÚ½âÎö HTML
+beautifulsoup4       # ç”¨äºè§£æ HTML
 lxml
 
 # ================================
-# ÎÄ¼şºÍ¸ñÊ½´¦Àí
+# æ–‡ä»¶å’Œæ ¼å¼å¤„ç†
 # ================================
-PyMuPDF              # ÓÃÓÚ´¦Àí PDF
-python-docx          # ÓÃÓÚ´¦Àí Word (.docx)
-pillow               # ÓÃÓÚÍ¼Ïñ´¦Àí (PIL)
-pydub                # ÓÃÓÚÒôÆµ´¦Àí
+PyMuPDF              # ç”¨äºå¤„ç† PDF
+python-docx          # ç”¨äºå¤„ç† Word (.docx)
+pillow               # ç”¨äºå›¾åƒå¤„ç† (PIL)
+pydub                # ç”¨äºéŸ³é¢‘å¤„ç†
 
 # ================================
-# ×Ô¶¯»¯ºÍÍøÒ³×¥È¡
+# è‡ªåŠ¨åŒ–å’Œç½‘é¡µæŠ“å–
 # ================================
 selenium
 webdriver-manager
 youtube-transcript-api
 
 # ================================
-# ¸¨Öú¹¤¾ß
+# è¾…åŠ©å·¥å…·
 # ================================
-python-dotenv        # ÓÃÓÚ¹ÜÀí .env ÎÄ¼ş
+python-dotenv        # ç”¨äºç®¡ç† .env æ–‡ä»¶
 requests
