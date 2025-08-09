@@ -2,6 +2,7 @@
 # NEVER commit these files!
 .env
 service_account.json
+client_secret.json
 
 # --- Python Cache & Dependencies ---
 # Virtual environment folder
