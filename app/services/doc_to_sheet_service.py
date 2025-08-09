@@ -66,6 +66,23 @@ def read_text_from_doc_table(doc_id, creds):
         logging.error(f"读取 Doc 时发生未知错误: {e}")
         raise
 
+def get_first_sheet_name(sheet_id, creds):
+    try:
+        service = build('sheets', 'v4', credentials=creds)
+        spreadsheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id, fields='sheets.properties.title').execute()
+        sheets = spreadsheet_metadata.get('sheets', [])
+        if not sheets: raise Exception("目标电子表格中没有任何工作表。")
+        first_sheet_title = sheets[0].get('properties', {}).get('title')
+        if not first_sheet_title: raise Exception("无法获取第一个工作表的名称。")
+        return first_sheet_title
+    except HttpError as e:
+        if e.resp.status == 403: raise Exception("无权访问该 Google Sheet 以获取工作表名称。")
+        elif e.resp.status == 404: raise Exception("Google Sheet 未找到。")
+        else: raise e
+    except Exception as e:
+        logging.error(f"获取工作表名称时发生未知错误: {e}")
+        raise
+
 def write_to_sheet(sheet_id, sheet_name, values, creds):
     try:
         service = build('sheets', 'v4', credentials=creds)
@@ -91,10 +108,16 @@ def doc_to_sheet_automation_flow(params, creds):
         doc_id = extract_id_from_url(params['doc_url'])
         sheet_id = extract_id_from_url(params['sheet_url'])
         batch_size = params['batch_size']
-        diagnostic_mode = params.get('diagnostic_mode', False) # 获取诊断模式状态
 
         if not doc_id: yield "data: [ERROR] Google Doc 链接无效。\n\n"; return
         if not sheet_id: yield "data: [ERROR] Google Sheet 链接无效。\n\n"; return
+
+        try:
+            yield "data: 正在自动检测目标工作表名称...\n\n"
+            sheet_name = get_first_sheet_name(sheet_id, creds)
+            yield f"data: ✅ 将写入工作表: '{sheet_name}'\n\n"
+        except Exception as e:
+            yield f"data: ❌ [ERROR] 自动检测工作表名称失败: {e}\n\n"; return
 
         yield f"data: 正在读取并净化 Google Doc 内容...\n\n"
         paragraphs = read_text_from_doc_table(doc_id, creds)
@@ -114,23 +137,14 @@ def doc_to_sheet_automation_flow(params, creds):
             end_para_num = min(batch_end_index, total_paragraphs)
             
             yield f"data: 正在处理第 {i + 1}/{total_batches} 批 (段落 {start_para_num}-{end_para_num})...\n\n"
-            
             batch_text_to_process = "\n\n<--PARAGRAPH_BREAK-->\n\n".join(batch_paragraphs)
             
-            # --- 这里是核心修改：诊断模式逻辑 ---
-            if diagnostic_mode:
-                yield f"data: --- [诊断信息] 发送给AI的原文如下 ---\n{batch_text_to_process}\n--- [诊断信息结束] ---\n\n"
-            # ------------------------------------
-
             if not batch_text_to_process.strip():
-                yield f"data: 跳过批次 {i + 1} (空批次)。\n\n"
-                continue
+                yield f"data: 跳过批次 {i + 1} (空批次)。\n\n"; continue
             
             try:
                 aligned_text = process_alignment_request(
-                    text=batch_text_to_process,
-                    model_name=params['model_name'],
-                    temperature=params['temperature']
+                    text=batch_text_to_process, model_name=params['model_name'], temperature=params['temperature']
                 )
                 if aligned_text and aligned_text.strip():
                     lines = aligned_text.strip().split('\n')
@@ -138,7 +152,6 @@ def doc_to_sheet_automation_flow(params, creds):
                     yield f"data: ✅ 批次 {i + 1} 处理完成，生成了 {len(lines)} 行对齐文本。\n\n"
                 else:
                     yield f"data: ⚠️ [WARNING] 批次 {i + 1} 处理后返回空结果，已跳过。\n\n"
-
             except Exception as e:
                 error_message = f"批次 {i + 1} 处理失败: {e}"
                 yield f"data: ❌ [ERROR] {error_message}\n\n"
@@ -146,16 +159,17 @@ def doc_to_sheet_automation_flow(params, creds):
             
             if i < total_batches - 1:
                 sleep_time = random.randint(params['interval_min'], params['interval_max'])
-                yield f"data: ⏳ 等待 {sleep_time} 秒...\n\n"
-                time.sleep(sleep_time)
+                yield f"data: ⏳ 等待 {sleep_time} 秒...\n\n"; time.sleep(sleep_time)
 
         if not all_aligned_lines:
-            yield "data: [DONE] 没有可写入的数据，任务结束。\n\n"
-            return
+            yield "data: [DONE] 没有可写入的数据，任务结束。\n\n"; return
             
-        yield f"data: 正在将 {len(all_aligned_lines)} 行结果写入 Google Sheet...\n\n"
-        write_to_sheet(sheet_id, params['sheet_name'], all_aligned_lines, creds)
-        yield "data: [DONE] 数据写入成功！自动化流程结束。\n\n"
+        yield f"data: 所有批次处理完毕，正在将 {len(all_aligned_lines)} 行结果写入 Google Sheet...\n\n"
+        result = write_to_sheet(sheet_id, sheet_name, all_aligned_lines, creds)
+        if result and result.get('updates', {}).get('updatedCells', 0) > 0:
+            yield f"data: [DONE] 数据写入成功！Google API 报告已写入 {result['updates']['updatedCells']} 个单元格。\n\n"
+        else:
+            yield f"data: [WARNING] API调用看似成功，但没有数据被实际写入。请检查后端日志。\n\n"
         
     except Exception as e:
         logging.error(f"自动化流程发生错误: {e}", exc_info=True)

@@ -1,37 +1,23 @@
-# ==================================
-# 关键：忽略所有敏感信息
-# 绝对不能将包含密码或API密钥的文件上传！
-# ==================================
+# --- Secrets & Environment ---
+# NEVER commit these files!
 .env
+service_account.json
 
-
-# ==================================
-# 忽略 Python 相关的缓存和临时文件
-# ==================================
+# --- Python Cache & Dependencies ---
+# Virtual environment folder
+venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
 
+# --- Session & Build Artifacts ---
+# Flask's server-side session files (if any remain)
+flask_session/
+# PyInstaller output
+dist/
+build/
+*.spec
 
-# ==================================
-# 忽略 Python 虚拟环境
-# 虚拟环境文件夹体积巨大且包含本地路径信息
-# ==================================
-venv/
-env/
-.venv/
-.env/
-
-
-# ==================================
-# 忽略操作系统或编辑器生成的文件
-# ==================================
-# Mac
-.DS_Store
-
-# VS Code
+# --- IDE & OS specific ---
 .vscode/
-
-# PyCharm
 .idea/
+.DS_Store
