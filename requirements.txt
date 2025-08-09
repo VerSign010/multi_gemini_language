@@ -1,107 +1,45 @@
-aiohappyeyeballs==2.6.1
-aiohttp==3.12.14
-aiosignal==1.4.0
-altgraph==0.17.4
-annotated-types==0.7.0
-anyio==4.9.0
-attrs==24.3.0
-beautifulsoup4==4.13.4
-blinker==1.9.0
-cachelib==0.13.0
-cachetools==5.5.2
-certifi==2024.7.4
-cffi==1.17.1
-chardet==3.0.4
-charset-normalizer==3.3.2
-click==8.2.1
-colorama==0.4.6
-distro==1.9.0
-fire==0.7.0
-Flask==3.1.1
-Flask-Session==0.8.0
-fonttools==4.54.1
-frozenlist==1.7.0
-google-ai-generativelanguage==0.6.15
-google-api-core==2.25.1
-google-api-python-client==2.176.0
-google-auth==2.40.3
-google-auth-httplib2==0.2.0
-google-auth-oauthlib==1.2.2
-google-generativeai==0.8.5
-googleapis-common-protos==1.70.0
-googletrans==4.0.0rc1
-grpcio==1.73.1
-grpcio-status==1.71.2
-gunicorn==23.0.0
-h11==0.16.0
-h2==3.2.0
-hpack==3.0.0
-hstspreload==2024.8.1
-httpcore==1.0.9
-httplib2==0.22.0
-httpx==0.28.1
-hyperframe==5.2.0
-idna==2.10
-itsdangerous==2.2.0
-Jinja2==3.1.6
-jiter==0.10.0
-lxml==4.9.3
-Markdown==3.8.2
-markdown-it-py==3.0.0
-MarkupSafe==3.0.2
-mdurl==0.1.2
-msgspec==0.19.0
-multidict==6.6.3
-numpy==2.0.0
-oauthlib==3.3.1
-openai==1.97.0
-opencv-python-headless==4.10.0.84
-outcome==1.3.0.post0
-packaging==24.2
-pdf2docx==0.5.8
-pefile==2023.2.7
-pillow==10.4.0
-propcache==0.3.2
-proto-plus==1.26.1
-protobuf==5.29.5
-pyasn1==0.6.1
-pyasn1_modules==0.4.2
-pycparser==2.22
-pydantic==2.11.7
-pydantic_core==2.33.2
-pydub==0.25.1
-pyinstaller==6.13.0
-pyinstaller-hooks-contrib==2025.3
-PyMuPDF==1.24.10
-PyMuPDFb==1.24.10
-pypandoc==1.14
-pyparsing==3.2.3
-PySocks==1.7.1
-python-docx==1.1.0
-python-dotenv==1.0.1
-pywin32-ctypes==0.2.3
-requests==2.32.3
-requests-oauthlib==2.0.0
-rfc3986==1.5.0
-rsa==4.9.1
-scipy==1.14.0
-selenium==4.27.1
-setuptools==78.1.1
-sniffio==1.3.1
-sortedcontainers==2.4.0
-soupsieve==2.7
-termcolor==2.5.0
-tkinterdnd2==0.4.3
-tqdm==4.67.1
-trio==0.28.0
-trio-websocket==0.11.1
-typing-inspection==0.4.1
-typing_extensions==4.12.2
-uritemplate==4.2.0
-urllib3==2.2.2
-webdriver-manager==4.0.2
-websocket-client==1.8.0
-Werkzeug==3.1.3
-wsproto==1.2.0
-yarl==1.20.1
-youtube-transcript-api==0.6.2
+# ================================
+# Web 框架和服务器
+# ================================
+Flask
+Flask-Session
+gunicorn
+
+# ================================
+# 核心功能库
+# ================================
+google-generativeai  # 用于 Gemini
+openai               # 用于 OpenAI
+google-api-python-client # 用于 Google Sheets/Drive 等
+google-auth-oauthlib
+googletrans          # 用于翻译
+
+# ================================
+# 数据处理和科学计算
+# ================================
+pandas               # 如果您用到了 pandas for excel
+numpy
+scipy
+beautifulsoup4       # 用于解析 HTML
+lxml
+
+# ================================
+# 文件和格式处理
+# ================================
+PyMuPDF              # 用于处理 PDF
+python-docx          # 用于处理 Word (.docx)
+pillow               # 用于图像处理 (PIL)
+pydub                # 用于音频处理
+
+# ================================
+# 自动化和网页抓取
+# ================================
+selenium
+webdriver-manager
+youtube-transcript-api
+
+# ================================
+# 辅助工具
+# ================================
+python-dotenv        # 用于管理 .env 文件
+requests
