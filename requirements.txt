@@ -4,6 +4,7 @@
 Flask
 # Flask-Session
 gunicorn
+gevent
 
 # ================================
 # 核心功能库
