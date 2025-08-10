@@ -4,100 +4,23 @@
 
 {% block head_styles %}
 <style>
-    /* ---------------------------------- */
-    /* ---      最终、更美观的样式      --- */
-    /* ---------------------------------- */
-    .container {
-        max-width: 1140px;
-    }
-    .card + .card {
-        margin-top: 1.5rem;
-    }
-    .card-header h4 {
-        margin-bottom: 0;
-    }
-    .control-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-    }
-    .control-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    .control-group label {
-        font-weight: 500;
-        color: #495057;
-    }
-    .interval-group {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    /* --- 这里是核心修改 --- */
-    /* 将 io-grid 直接定义为两列，让子元素自然填充 */
-    .io-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr; /* 强制两列布局 */
-        gap: 1.5rem;
-        /* 将诊断模式放在新的一行 */
-        grid-template-areas:
-            "doc sheet"
-            "diag diag";
-    }
-    /* 分别为 Doc 和 Sheet 指定网格区域 */
+    /* 样式与之前版本保持一致 */
+    .container { max-width: 1140px; }
+    .card + .card { margin-top: 1.5rem; }
+    .card-header h4 { margin-bottom: 0; }
+    .control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+    .control-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    .control-group label { font-weight: 500; color: #495057; }
+    .interval-group { display: flex; align-items: center; gap: 0.5rem; }
+    .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; grid-template-areas: "doc sheet" "diag diag"; }
     #doc-group { grid-area: doc; }
     #sheet-group { grid-area: sheet; }
     #diag-group { grid-area: diag; }
-    /* -------------------- */
-
-    .diagnostic-mode {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        background-color: #fff3cd;
-        padding: 0.75rem;
-        border-radius: 0.375rem;
-    }
-    .button-container {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-        margin-top: 1.5rem;
-    }
-    .log-box {
-        height: 350px;
-        overflow-y: scroll;
-        border: 1px solid #dee2e6;
-        padding: 1rem;
-        background-color: #f8f9fa;
-        font-family: monospace;
-        white-space: pre-wrap;
-        border-radius: 0.375rem;
-    }
-    .status-bar {
-        min-height: 48px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background-color: #e9ecef;
-        border-radius: 5px;
-        padding: 10px;
-        font-size: 1.1em;
-        font-weight: 500;
-        margin-top: 1.5rem;
-    }
-    .loader {
-        border: 4px solid #f3f3f3;
-        border-radius: 50%;
-        border-top: 4px solid #0d6efd;
-        width: 24px;
-        height: 24px;
-        animation: spin 1s linear infinite;
-        margin-right: 10px;
-    }
+    .diagnostic-mode { display: flex; align-items: center; gap: 0.5rem; background-color: #fff3cd; padding: 0.75rem; border-radius: 0.375rem; }
+    .button-container { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
+    .log-box { height: 350px; overflow-y: scroll; border: 1px solid #dee2e6; padding: 1rem; background-color: #f8f9fa; font-family: monospace; white-space: pre-wrap; border-radius: 0.375rem; }
+    .status-bar { min-height: 48px; display: flex; justify-content: center; align-items: center; background-color: #e9ecef; border-radius: 5px; padding: 10px; font-size: 1.1em; font-weight: 500; margin-top: 1.5rem; }
+    .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #0d6efd; width: 24px; height: 24px; animation: spin 1s linear infinite; margin-right: 10px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
 {% endblock %}
@@ -112,10 +35,16 @@
     <!-- 第一板块：初始化设置 -->
     <div class="card shadow-sm">
         <div class="card-header">
-            <h4>⚙️ 初始设置</h4>
+            <h4>⚙️ 初始化设置</h4>
         </div>
         <div class="card-body">
             <div class="control-grid">
+                <!-- --- 这里是核心修改：新增 API Key 输入框 --- -->
+                <div class="control-group">
+                    <label for="geminiApiKey">您的 Gemini API Key:</label>
+                    <input type="password" class="form-control" id="geminiApiKey" placeholder="在此输入您的 API Key">
+                </div>
+                <!-- ----------------------------------------- -->
                 <div class="control-group">
                     <label for="model-selector">Gemini 模型:</label>
                     <select id="model-selector" class="form-select">
@@ -136,9 +65,9 @@
                 <div class="control-group">
                     <label>批次间随机间隔 (秒):</label>
                     <div class="interval-group">
-                        <input type="number" id="interval-min" class="form-control" value="10" min="0">
+                        <input type="number" id="interval-min" class="form-control" value="3" min="0">
                         <span>-</span>
-                        <input type="number" id="interval-max" class="form-control" value="20" min="0">
+                        <input type="number" id="interval-max" class="form-control" value="5" min="0">
                     </div>
                 </div>
             </div>
@@ -151,22 +80,20 @@
             <h4>🔗 输入与输出</h4>
         </div>
         <div class="card-body">
-            <!-- --- 这里是核心修改 --- -->
             <div class="io-grid">
                 <div id="doc-group" class="control-group">
                     <label for="docUrl">源 Google Doc 链接:</label>
                     <input type="url" class="form-control" id="docUrl" placeholder="粘贴 Google Doc 链接...">
                 </div>
                 <div id="sheet-group" class="control-group">
-                    <label for="sheetUrl">目标 Google Sheet 链接:</label>
-                    <input type="url" class="form-control" id="sheetUrl" placeholder="粘贴 Google Sheet 链接...">
+                    <label for="sheetUrl">目标 Google Sheet 子表链接:</label>
+                    <input type="url" class="form-control" id="sheetUrl" placeholder="粘贴包含 #gid=... 的子表链接...">
                 </div>
                 <div id="diag-group" class="diagnostic-mode">
                     <input type="checkbox" id="diagnostic-mode-checkbox" class="form-check-input">
                     <label for="diagnostic-mode-checkbox" class="form-check-label">开启诊断模式</label>
                 </div>
             </div>
-            <!-- -------------------- -->
         </div>
     </div>
 
@@ -187,7 +114,7 @@
 
 {% block scripts %}
 <script>
-    // JavaScript 部分与上一版完全相同，无需修改
+    // JavaScript 部分与上一版完全相同，只需在 settingsInputs 中加回 geminiApiKey
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
     const logBox = document.getElementById('logBox');
@@ -197,6 +124,7 @@
     const diagnosticCheckbox = document.getElementById('diagnostic-mode-checkbox');
 
     const settingsInputs = {
+        geminiApiKey: document.getElementById('geminiApiKey'), // <-- 加回这一行
         model: document.getElementById('model-selector'),
         temperature: temperatureSlider,
         batchSize: document.getElementById('batch-size'),
@@ -205,7 +133,7 @@
         docUrl: document.getElementById('docUrl'),
         sheetUrl: document.getElementById('sheetUrl')
     };
-    const SETTINGS_KEY = 'alignerToolSettings_ServiceAccount_v2';
+    const SETTINGS_KEY = 'alignerToolSettings_ServiceAccount_v6'; // 更新Key
 
     let isProcessing = false;
 
@@ -229,7 +157,7 @@
     stopButton.addEventListener('click', stopAutomation);
     temperatureSlider.addEventListener('input', () => { temperatureValueSpan.textContent = parseFloat(settingsInputs.temperature.value).toFixed(2); });
     Object.values(settingsInputs).forEach(input => {
-        const eventType = (input.type.match(/range|text|url|number/)) ? 'input' : 'change';
+        const eventType = (input.type.match(/range|text|password|url|number/)) ? 'input' : 'change';
         input.addEventListener(eventType, saveSettings);
     });
 
@@ -260,6 +188,7 @@
         statusBar.innerHTML = '<div class="loader"></div><span>正在连接服务器...</span>';
 
         const params = {
+            gemini_api_key: settingsInputs.geminiApiKey.value, // <-- 加回这一行
             doc_url: settingsInputs.docUrl.value,
             sheet_url: settingsInputs.sheetUrl.value,
             model_name: settingsInputs.model.value,
@@ -270,6 +199,11 @@
             diagnostic_mode: diagnosticCheckbox.checked
         };
         
+        if (!params.gemini_api_key) {
+            alert('请输入您的 Gemini API Key。');
+            updateButtonStates(false);
+            return;
+        }
         if (!params.doc_url || !params.sheet_url) {
             alert('请提供 Google Doc 和 Google Sheet 的链接。');
             updateButtonStates(false);

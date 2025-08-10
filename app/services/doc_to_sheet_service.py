@@ -1,5 +1,5 @@
 # app/services/doc_to_sheet_service.py
-
+# ... (所有顶部的函数 clean_text, extract_id_from_url, 等保持不变) ...
 import re
 import time
 import random
@@ -21,6 +21,10 @@ def clean_text(text):
 def extract_id_from_url(url):
     match = re.search(r'/d/([^/]+)', url)
     return match.group(1) if match else None
+
+def extract_gid_from_url(url):
+    match = re.search(r'#gid=(\d+)', url)
+    return int(match.group(1)) if match else None
 
 def _read_paragraph_elements(elements):
     text = ''
@@ -59,22 +63,36 @@ def read_text_from_doc_table(doc_id, creds):
                 activation_url = f"https://console.developers.google.com/apis/api/docs.googleapis.com/overview?project={project_id}"
                 raise Exception(f"Google Docs API 被禁用。请访问此链接开启: {activation_url}")
         except (json.JSONDecodeError, KeyError, IndexError): pass
-        if e.resp.status == 403: raise Exception("无权访问该 Google Doc。")
+        if e.resp.status == 403: raise Exception("无权访问该 Google Doc。请检查文件共享权限。")
         elif e.resp.status == 404: raise Exception("Google Doc 未找到。")
         else: raise e
     except Exception as e:
         logging.error(f"读取 Doc 时发生未知错误: {e}")
         raise
 
-def get_first_sheet_name(sheet_id, creds):
+def get_sheet_name_from_url(sheet_url, creds):
+    sheet_id = extract_id_from_url(sheet_url)
+    gid = extract_gid_from_url(sheet_url)
+    if not sheet_id:
+        raise Exception("Google Sheet 链接无效。")
     try:
         service = build('sheets', 'v4', credentials=creds)
-        spreadsheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id, fields='sheets.properties.title').execute()
+        spreadsheet_metadata = service.spreadsheets().get(
+            spreadsheetId=sheet_id, fields='sheets(properties(sheetId,title))'
+        ).execute()
         sheets = spreadsheet_metadata.get('sheets', [])
-        if not sheets: raise Exception("目标电子表格中没有任何工作表。")
-        first_sheet_title = sheets[0].get('properties', {}).get('title')
-        if not first_sheet_title: raise Exception("无法获取第一个工作表的名称。")
-        return first_sheet_title
+        if not sheets:
+            raise Exception("目标电子表格中没有任何工作表。")
+        if gid is not None:
+            for sheet in sheets:
+                if sheet.get('properties', {}).get('sheetId') == gid:
+                    return sheet.get('properties', {}).get('title')
+            raise Exception(f"链接中的 GID '{gid}' 无效或在目标表格中不存在。")
+        else:
+            first_sheet_title = sheets[0].get('properties', {}).get('title')
+            if not first_sheet_title:
+                raise Exception("无法获取第一个工作表的名称。")
+            return first_sheet_title
     except HttpError as e:
         if e.resp.status == 403: raise Exception("无权访问该 Google Sheet 以获取工作表名称。")
         elif e.resp.status == 404: raise Exception("Google Sheet 未找到。")
@@ -85,14 +103,20 @@ def get_first_sheet_name(sheet_id, creds):
 
 def write_to_sheet(sheet_id, sheet_name, values, creds):
     try:
+        if not values:
+            logging.warning("写入操作被跳过，因为传入的数据列表为空。")
+            return None
+        rows_to_write = [line.split('\t') for line in values if isinstance(line, str) and line.strip()]
+        if not rows_to_write:
+            logging.warning("写入操作被跳过，因为过滤后没有有效的行可供写入。")
+            return None
         service = build('sheets', 'v4', credentials=creds)
-        rows_to_write = [line.split('\t') for line in values]
         body = {'values': rows_to_write}
         result = service.spreadsheets().values().append(
             spreadsheetId=sheet_id, range=f"'{sheet_name}'!A1",
             valueInputOption='USER_ENTERED', insertDataOption='INSERT_ROWS', body=body
         ).execute()
-        logging.info(f"{result.get('updates').get('updatedCells')} 个单元格已写入。")
+        logging.info(f"Google Sheets API 返回的完整响应: {result}")
         return result
     except HttpError as e:
         if e.resp.status == 403: raise Exception("无权访问或编辑该 Google Sheet。")
@@ -113,11 +137,11 @@ def doc_to_sheet_automation_flow(params, creds):
         if not sheet_id: yield "data: [ERROR] Google Sheet 链接无效。\n\n"; return
 
         try:
-            yield "data: 正在自动检测目标工作表名称...\n\n"
-            sheet_name = get_first_sheet_name(sheet_id, creds)
+            yield "data: 正在从URL智能检测目标工作表名称...\n\n"
+            sheet_name = get_sheet_name_from_url(params['sheet_url'], creds)
             yield f"data: ✅ 将写入工作表: '{sheet_name}'\n\n"
         except Exception as e:
-            yield f"data: ❌ [ERROR] 自动检测工作表名称失败: {e}\n\n"; return
+            yield f"data: ❌ [ERROR] 检测工作表名称失败: {e}\n\n"; return
 
         yield f"data: 正在读取并净化 Google Doc 内容...\n\n"
         paragraphs = read_text_from_doc_table(doc_id, creds)
@@ -143,9 +167,14 @@ def doc_to_sheet_automation_flow(params, creds):
                 yield f"data: 跳过批次 {i + 1} (空批次)。\n\n"; continue
             
             try:
+                # --- 核心修改：将 api_key 传递给处理函数 ---
                 aligned_text = process_alignment_request(
-                    text=batch_text_to_process, model_name=params['model_name'], temperature=params['temperature']
+                    text=batch_text_to_process, 
+                    model_name=params['model_name'], 
+                    temperature=params['temperature'],
+                    api_key=params['gemini_api_key'] # 新增
                 )
+                # -----------------------------------------
                 if aligned_text and aligned_text.strip():
                     lines = aligned_text.strip().split('\n')
                     all_aligned_lines.extend(lines)
