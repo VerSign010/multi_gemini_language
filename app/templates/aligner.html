@@ -4,7 +4,7 @@
 
 {% block head_styles %}
 <style>
-    /* 样式与之前版本保持一致 */
+    /* 样式与之前版本保持一致，为新输入框增加跨列样式 */
     .container { max-width: 1140px; }
     .card + .card { margin-top: 1.5rem; }
     .card-header h4 { margin-bottom: 0; }
@@ -22,6 +22,10 @@
     .status-bar { min-height: 48px; display: flex; justify-content: center; align-items: center; background-color: #e9ecef; border-radius: 5px; padding: 10px; font-size: 1.1em; font-weight: 500; margin-top: 1.5rem; }
     .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #0d6efd; width: 24px; height: 24px; animation: spin 1s linear infinite; margin-right: 10px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    /* 新增样式，让指令输入框横跨整行 */
+    .control-grid .full-width-prompt {
+        grid-column: 1 / -1;
+    }
 </style>
 {% endblock %}
 
@@ -39,12 +43,10 @@
         </div>
         <div class="card-body">
             <div class="control-grid">
-                <!-- --- 这里是核心修改：新增 API Key 输入框 --- -->
                 <div class="control-group">
                     <label for="geminiApiKey">您的 Gemini API Key:</label>
                     <input type="password" class="form-control" id="geminiApiKey" placeholder="在此输入您的 API Key">
                 </div>
-                <!-- ----------------------------------------- -->
                 <div class="control-group">
                     <label for="model-selector">Gemini 模型:</label>
                     <select id="model-selector" class="form-select">
@@ -70,6 +72,12 @@
                         <input type="number" id="interval-max" class="form-control" value="5" min="0">
                     </div>
                 </div>
+                <!-- --- 这里是核心修改：新增系统指令输入框 --- -->
+                <div class="control-group full-width-prompt">
+                    <label for="systemInstruction">系统指令 (System Prompt):</label>
+                    <textarea id="systemInstruction" class="form-control" rows="8" placeholder="在此输入您的系统指令..."></textarea>
+                </div>
+                <!-- ----------------------------------------- -->
             </div>
         </div>
     </div>
@@ -114,7 +122,7 @@
 
 {% block scripts %}
 <script>
-    // JavaScript 部分与上一版完全相同，只需在 settingsInputs 中加回 geminiApiKey
+    // JavaScript 部分与上一版完全相同，只需在 settingsInputs 中加入 systemInstruction
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
     const logBox = document.getElementById('logBox');
@@ -124,16 +132,17 @@
     const diagnosticCheckbox = document.getElementById('diagnostic-mode-checkbox');
 
     const settingsInputs = {
-        geminiApiKey: document.getElementById('geminiApiKey'), // <-- 加回这一行
+        geminiApiKey: document.getElementById('geminiApiKey'),
         model: document.getElementById('model-selector'),
         temperature: temperatureSlider,
         batchSize: document.getElementById('batch-size'),
         intervalMin: document.getElementById('interval-min'),
         intervalMax: document.getElementById('interval-max'),
+        systemInstruction: document.getElementById('systemInstruction'), // <-- 加入这一行
         docUrl: document.getElementById('docUrl'),
         sheetUrl: document.getElementById('sheetUrl')
     };
-    const SETTINGS_KEY = 'alignerToolSettings_ServiceAccount_v6'; // 更新Key
+    const SETTINGS_KEY = 'alignerToolSettings_ServiceAccount_v7'; // 更新Key
 
     let isProcessing = false;
 
@@ -157,7 +166,7 @@
     stopButton.addEventListener('click', stopAutomation);
     temperatureSlider.addEventListener('input', () => { temperatureValueSpan.textContent = parseFloat(settingsInputs.temperature.value).toFixed(2); });
     Object.values(settingsInputs).forEach(input => {
-        const eventType = (input.type.match(/range|text|password|url|number/)) ? 'input' : 'change';
+        const eventType = (input.type.match(/range|text|password|url|number|textarea/)) ? 'input' : 'change';
         input.addEventListener(eventType, saveSettings);
     });
 
@@ -188,7 +197,7 @@
         statusBar.innerHTML = '<div class="loader"></div><span>正在连接服务器...</span>';
 
         const params = {
-            gemini_api_key: settingsInputs.geminiApiKey.value, // <-- 加回这一行
+            gemini_api_key: settingsInputs.geminiApiKey.value,
             doc_url: settingsInputs.docUrl.value,
             sheet_url: settingsInputs.sheetUrl.value,
             model_name: settingsInputs.model.value,
@@ -196,11 +205,17 @@
             batch_size: parseInt(settingsInputs.batchSize.value, 10),
             interval_min: parseInt(settingsInputs.intervalMin.value, 10),
             interval_max: parseInt(settingsInputs.intervalMax.value, 10),
+            system_instruction: settingsInputs.systemInstruction.value, // <-- 加入这一行
             diagnostic_mode: diagnosticCheckbox.checked
         };
         
         if (!params.gemini_api_key) {
             alert('请输入您的 Gemini API Key。');
+            updateButtonStates(false);
+            return;
+        }
+        if (!params.system_instruction) { // 新增检查
+            alert('请输入系统指令。');
             updateButtonStates(false);
             return;
         }

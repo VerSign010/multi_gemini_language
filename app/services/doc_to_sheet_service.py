@@ -167,14 +167,15 @@ def doc_to_sheet_automation_flow(params, creds):
                 yield f"data: 跳过批次 {i + 1} (空批次)。\n\n"; continue
             
             try:
-                # --- 核心修改：将 api_key 传递给处理函数 ---
+                # --- 核心修改：将 system_instruction 传递给处理函数 ---
                 aligned_text = process_alignment_request(
                     text=batch_text_to_process, 
                     model_name=params['model_name'], 
                     temperature=params['temperature'],
-                    api_key=params['gemini_api_key'] # 新增
+                    api_key=params['gemini_api_key'],
+                    system_instruction=params['system_instruction'] # 新增
                 )
-                # -----------------------------------------
+                # -------------------------------------------------
                 if aligned_text and aligned_text.strip():
                     lines = aligned_text.strip().split('\n')
                     all_aligned_lines.extend(lines)

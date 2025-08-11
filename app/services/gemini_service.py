@@ -5,7 +5,7 @@ import random
 import re
 import google.generativeai as genai
 from functools import wraps
-from ..config import Config # 导入 Config 以便访问备用Key
+from ..config import Config
 try:
     from google.api_core.exceptions import ServiceUnavailable, DeadlineExceeded, InternalServerError, TooManyRequests
 except ImportError:
@@ -34,46 +34,40 @@ def retry_on_api_error(max_retries=3, base_delay=5):
         return wrapper
     return decorator
 
-def load_instructions():
-    try:
-        with open('aligner_prompt.md', 'r', encoding='utf-8') as f:
-            return {'aligner': f.read()}
-    except FileNotFoundError:
-        logging.error("指令文件未找到: aligner_prompt.md")
-        return {'aligner': "错误：无法加载对齐指令。"}
+# --- 核心修改：移除 load_instructions 和 INSTRUCTIONS ---
+# def load_instructions(): ...
+# INSTRUCTIONS = load_instructions()
+# ----------------------------------------------------
 
-INSTRUCTIONS = load_instructions()
-
-# 移除全局模型缓存，因为 API Key 是动态的
+# 移除全局模型缓存，因为 API Key 和指令都是动态的
 # model_cache = {}
 
 @retry_on_api_error(max_retries=3, base_delay=3)
-def process_alignment_request(text, model_name, temperature=0.2, api_key=None):
+def process_alignment_request(text, model_name, temperature=0.2, api_key=None, system_instruction=None):
     """
     处理三语对齐请求。
-    现在可以接收用户提供的 api_key。
+    现在使用用户提供的 api_key 和 system_instruction。
     """
-    # --- 核心修改：动态配置 API Key ---
-    # 优先使用用户提供的 Key，如果为空，则回退到环境变量中的 Key
     final_api_key = api_key if api_key and api_key.strip() else Config.GEMINI_API_KEY
-    
     if not final_api_key:
         raise Exception("Gemini API Key 未提供。请在前端输入或在服务器环境变量中配置。")
     
+    # --- 核心修改：增加对 system_instruction 的检查 ---
+    if not system_instruction or not system_instruction.strip():
+        raise Exception("系统指令 (System Prompt) 未提供。")
+    # -------------------------------------------------
+    
     try:
-        # 每次调用都使用正确的 Key 进行配置
         genai.configure(api_key=final_api_key)
     except Exception as e:
         raise Exception(f"配置 Gemini API 失败: {e}")
-    # ------------------------------------
 
-    system_instruction = INSTRUCTIONS.get('aligner', 'Please align the text.')
     prompt = f"---\n{text}\n---"
     
-    # 因为 Key 是动态的，所以每次都重新创建模型实例
+    # 因为 Key 和指令都是动态的，所以每次都重新创建模型实例
     model = genai.GenerativeModel(
         model_name=model_name,
-        system_instruction=system_instruction,
+        system_instruction=system_instruction, # 直接使用传入的指令
         generation_config=genai.types.GenerationConfig(temperature=temperature)
     )
     
@@ -95,6 +89,6 @@ def process_alignment_request(text, model_name, temperature=0.2, api_key=None):
         raise Exception(f"模型没有返回任何内容。终止原因: {error_info}")
 
     raw_result = response.text
-    pattern = r"^\s*```(?:tsv)?\n?|\n?```\s*$"
+    pattern = r"^\s*```(?:tsv)?\n?|\n?```s*$"
     cleaned_result = re.sub(pattern, "", raw_result, flags=re.MULTILINE).strip()
     return cleaned_result

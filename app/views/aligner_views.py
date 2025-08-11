@@ -46,12 +46,13 @@ def process_doc_to_sheet():
 
     params = request.get_json()
     
-    # --- 核心修改：将 gemini_api_key 加入必要参数列表 ---
+    # --- 核心修改：将 system_instruction 加入必要参数列表 ---
     required_params = [
-        'gemini_api_key', # 新增
+        'gemini_api_key',
         'doc_url', 'sheet_url', 
         'model_name', 'temperature', 'batch_size',
-        'interval_min', 'interval_max'
+        'interval_min', 'interval_max',
+        'system_instruction' # 新增
     ]
     # -------------------------------------------------
     
