@@ -16,10 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 6. 暴露 Render 期望的端口
-#    Render 会自动将 PORT 环境变量设置为 10000
 EXPOSE 10000
 
 # 7. 定义容器启动时要执行的命令
 #    --- 这里是核心修改 ---
-#    让 Gunicorn 从 Render 提供的 $PORT 环境变量中读取端口
-CMD ["gunicorn", "--worker-class", "gevent", "--timeout", "300", "--workers", "1", "--bind", "0.0.0.0:$PORT", "run:app"]
+#    使用 Shell 形式来确保 $PORT 环境变量能被正确解析
+CMD gunicorn --worker-class gevent --timeout 300 --workers 1 --bind "0.0.0.0:$PORT" run:app
